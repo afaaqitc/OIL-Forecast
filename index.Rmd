@@ -142,7 +142,7 @@ axis.text.y = element_text(face = "bold",colour = "black",size = 9))
  
 
 
-### Detect Forecast Model Fore Last 8 Months
+### Detect Model Fore Last 8 Months
 ```{r ,echo=FALSE,warning=FALSE,message=FALSE}
 ggplotly( detect_last_chart,width = 800)
 ```
@@ -166,6 +166,13 @@ monthly_forecast_gt
 ```
 
 
+
+
+### Other Models
+
+["BTC"](https://afaaqitc.github.io/BTC-Forecast/)
+
+["S&P500"](https://afaaqitc.github.io/SP500/#Last_Year_Table)
 
 
 
