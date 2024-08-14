@@ -1,0 +1,182 @@
+---
+title: "Oil-Forecast"
+author: "JDRK"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    theme: flatly
+    toc: yes
+    toc_float:
+      collapsed: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tufte)
+library(tint)
+library(rmdformats)
+library(prettydoc)
+library(hrbrthemes)
+library(quantmod)
+library(tidyr)
+library(dplyr)
+library(lubridate)
+library(stringr)
+library(formattable)
+library(data.table)
+library(ggplot2)
+library(plotly)
+library(pacman)
+library(janitor)
+library(GGally)
+library(forecast)
+library(tseries)
+library(corrplot)
+library(openxlsx)
+library(readxl)
+library(DT)
+library(gt)
+library(tibble)
+
+getSymbols("CL=F",from="2010-01-01")
+
+cl<-rownames_to_column(data.frame( `CL=F`)) %>% select(1,7) %>% 
+rename(date=rowname,price=CL.F.Adjusted) %>% mutate(date=as.Date(date)) %>% 
+mutate(mn=round_date(date,"month"))
+
+
+mn_data<-
+cl %>% group_by(mn) %>% summarize(price=mean(price,na.rm = T)) %>%
+arrange(mn) %>% mutate(mn=as.POSIXct(mn))
+
+mn_lts<-ts(mn_data$price,start = c(2010,1),end = c(2023,12),frequency = 12)
+ 
+mn_lets<-ets(mn_lts) 
+
+mn_lef<-forecast(mn_lets,h = 8)
+
+mn_lar<-auto.arima(mn_lts)
+
+mn_lf<-forecast(mn_lar,h = 8)
+
+detect_last<-
+cbind(mn_data[mn_data$mn>="2024-1-1",] %>% rename(date=mn),
+rownames_to_column(data.frame(mn_lef)) %>% 
+mutate(Low=(Lo.80+Lo.95)/2,Hi=(Hi.80+Hi.95)/2) %>% select(2,7,8))
+  
+detect_last_gt<-
+  detect_last%>% gt %>%
+  tab_header(title = "Oil Forecast Model 'CL=F'",subtitle = "From Sep 2024 - Feb 2026") %>% 
+  cols_label(Point.Forecast="Forecast.P") %>% cols_label_with(columns = everything(),fn = toupper) %>% 
+  cols_align(align = "center",columns = everything()) %>% 
+  tab_style(style =list(cell_fill(color="#f1f2f6"),cell_text(weight = "bold",align = "left")) ,locations = cells_group()) %>% 
+  tab_style(style =list(cell_fill(color="#eccc68"),cell_text(weight = "bold" )) ,locations = cells_title()) %>% 
+  tab_style(style =list(cell_fill(color="#57606f"),cell_text(color="white",weight = "bold" )) ,locations = cells_column_labels()) %>% 
+  tab_style(style =list(cell_fill(color="#57606f"),cell_text(color="white",weight = "bold" )) ,locations = cells_stub()) %>% 
+  tab_style(style =list(cell_fill(color="#57606f"),cell_text(color="white",weight = "bold" )) ,locations = cells_stubhead()) %>% 
+  fmt_number(columns = c(2:5),decimals = 2) %>% 
+  tab_style(style =list(cell_text(color="#57606f",weight = "bold" )) ,locations = cells_body()) %>% 
+  grand_summary_rows( columns = c(2:5),fns = list(Mean=~mean(.)),formatter = fmt_number,decimals=2) %>% 
+  tab_style(style =list(cell_fill(color="#2f3542"),cell_text(color="white",weight = "bold")) ,locations = cells_grand_summary()) %>% 
+  tab_style(style =list(cell_fill(color="#2f3542"),cell_text(color="white",weight = "bold")) ,locations = cells_stub_grand_summary())
+
+
+
+detect_last_chart<-
+detect_last %>% mutate(date=as.POSIXct(date)) %>% 
+pivot_longer(!date,names_to ="cat" ,values_to = "values") %>% 
+ggplot(aes(x=date,y=values,color=cat,group=cat))+geom_line(size=0.8)+
+theme_bw()+labs(x="",y="")+
+scale_x_datetime(date_breaks ="month" ,date_labels ="%B-%y" )
+
+
+# Real 
+
+mn_ts<-ts(mn_data$price,start =c(2010,1) ,end = c(2024,8),frequency = 12)
+
+mn_ets<-ets(mn_ts) 
+
+mn_f<-forecast(mn_ets,h = 18) # Acurr.
+
+
+monthly_forecast<-
+cbind(
+data.frame(date=seq(as.Date("2024-09-01"),by="month",len=18)) %>% 
+  mutate(date=as.Date(date)),
+rownames_to_column(data.frame(mn_f)) %>%
+mutate(Low=(Lo.80+Lo.95)/2,Hi=(Hi.95+Hi.80)/2)
+) %>% select(1,3,8,9)
+
+monthly_forecast_gt<-
+monthly_forecast %>% gt %>%
+tab_header(title = "Oil Forecast Model 'CL=F'",subtitle = "From Sep 2024 - Feb 2026") %>% 
+tab_row_group(label = "2024",rows =date>="2024-1-1" & date <="2024-12-31" ,id = "2024",group = "2024") %>% 
+tab_row_group(label = "2025",rows =date>="2025-1-1" & date <="2025-12-31" ,id = "2025",group = "2025") %>% 
+tab_row_group(label = "2026",rows =date>="2026-1-1" & date <="2026-12-31" ,id = "2026",group = "2026") %>% 
+row_group_order(groups = c("2024","2025","2026")) %>% 
+summary_rows(groups = everything(),columns = c(2:4),fns =list(Mean=~mean(.)),formatter = fmt_number,decimals=2) %>% 
+cols_label(Point.Forecast="Forecast.P") %>% cols_label_with(columns = everything(),fn = toupper) %>% 
+cols_align(align = "center",columns = everything()) %>% 
+tab_style(style =list(cell_fill(color="#f1f2f6"),cell_text(weight = "bold",align = "left")) ,locations = cells_group()) %>% 
+tab_style(style =list(cell_fill(color="#eccc68"),cell_text(weight = "bold" )) ,locations = cells_title()) %>% 
+tab_style(style =list(cell_fill(color="#57606f"),cell_text(color="white",weight = "bold" )) ,locations = cells_summary()) %>% 
+tab_style(style =list(cell_fill(color="#57606f"),cell_text(color="white",weight = "bold" )) ,locations = cells_stub_summary()) %>% 
+tab_style(style =list(cell_fill(color="#57606f"),cell_text(color="white",weight = "bold" )) ,locations = cells_column_labels()) %>% 
+tab_style(style =list(cell_fill(color="#57606f"),cell_text(color="white",weight = "bold" )) ,locations = cells_stub()) %>% 
+tab_style(style =list(cell_fill(color="#57606f"),cell_text(color="white",weight = "bold" )) ,locations = cells_stubhead()) %>% 
+fmt_number(columns = c(2:4),decimals = 2) %>% 
+tab_style(style =list(cell_text(color="#57606f",weight = "bold" )) ,locations = cells_body())
+
+monthly_forecast_chart<-
+monthly_forecast %>% pivot_longer(!date,names_to = "cat",values_to = "values") %>% 
+mutate(date=as.POSIXct(date)) %>% 
+ggplot(aes(x=date,y=values,color=cat,group=cat))+
+  geom_line(size=0.9)+theme_bw()+labs(x="",y="")+
+scale_x_datetime(date_breaks ="month" ,date_labels = "%b-%y")+
+scale_y_continuous(breaks = c(30,40,50,60,70,80,90,100,110,120))+
+theme(axis.text.x = element_text(face = "bold",colour = "black",size = 9),
+axis.text.y = element_text(face = "bold",colour = "black",size = 9))
+
+```
+ 
+
+
+### Detect Forecast Model Fore Last 8 Months
+```{r ,echo=FALSE,warning=FALSE,message=FALSE}
+ggplotly( detect_last_chart,width = 800)
+```
+
+
+### Last 8 Months Table
+```{r ,echo=FALSE,warning=FALSE,message=FALSE}
+detect_last_gt
+```
+
+
+### Forecast Model For 18 Month Next 
+```{r ,echo=FALSE,warning=FALSE,message=FALSE}
+ggplotly( monthly_forecast_chart,width = 800)
+```
+
+
+### Forecast Next Table
+```{r ,echo=FALSE,warning=FALSE,message=FALSE}
+monthly_forecast_gt
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
