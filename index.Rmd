@@ -54,21 +54,19 @@ mn_lts<-ts(mn_data$price,start = c(2010,1),end = c(2023,12),frequency = 12)
  
 mn_lets<-ets(mn_lts) 
 
-mn_lef<-forecast(mn_lets,h = 8)
+mn_lef<-forecast(mn_lets,h = 9)
 
 mn_lar<-auto.arima(mn_lts)
 
-mn_lf<-forecast(mn_lar,h = 8)
+mn_lf<-forecast(mn_lar,h = 9)
 
 detect_last<-
-cbind(mn_data[mn_data$mn>="2024-1-1",] %>% rename(date=mn),
-rownames_to_column(data.frame(mn_lef)) %>% 
-mutate(Low=(Lo.80+Lo.95)/2,Hi=(Hi.80+Hi.95)/2) %>% select(2,7,8))
+ cbind(mn_data[mn_data$mn>="2024-1-1",],rownames_to_column(data.frame(mn_lef)) %>% rename(date=rowname) ) %>% mutate(Low=(Lo.80+Lo.95)/2,Hi=(Hi.80+Hi.95)/2) %>% select(c(1,2,7,8,9,10))  
   
 detect_last_gt<-
   detect_last%>% gt %>%
   tab_header(title = "Oil Forecast Model 'CL=F'",subtitle = "From Sep 2024 - Feb 2026") %>% 
-  cols_label(Point.Forecast="Forecast.P") %>% cols_label_with(columns = everything(),fn = toupper) %>% 
+  cols_label_with(columns = everything(),fn = toupper) %>% 
   cols_align(align = "center",columns = everything()) %>% 
   tab_style(style =list(cell_fill(color="#f1f2f6"),cell_text(weight = "bold",align = "left")) ,locations = cells_group()) %>% 
   tab_style(style =list(cell_fill(color="#eccc68"),cell_text(weight = "bold" )) ,locations = cells_title()) %>% 
@@ -84,7 +82,7 @@ detect_last_gt<-
 
 
 detect_last_chart<-
-detect_last %>% mutate(date=as.POSIXct(date)) %>% 
+detect_last %>%rename(date=mn) %>% mutate(date=as.POSIXct(date)) %>% 
 pivot_longer(!date,names_to ="cat" ,values_to = "values") %>% 
 ggplot(aes(x=date,y=values,color=cat,group=cat))+geom_line(size=0.8)+
 theme_bw()+labs(x="",y="")+
@@ -170,9 +168,9 @@ monthly_forecast_gt
 
 ### Other Models
 
-["BTC"](https://afaaqitc.github.io/BTC-Forecast/)
+["BTC"](https://afaaqitc.github.io/BTC-Forecast/){target="_blank"}
 
-["S&P500"](https://afaaqitc.github.io/SP500/#Last_Year_Table)
+["S&P500"](https://afaaqitc.github.io/SP500/){target="_blank"}
 
 
 
